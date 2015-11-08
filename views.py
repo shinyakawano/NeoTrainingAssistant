@@ -1,93 +1,109 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python3
 
-from flask import *
-import os, sys
-import json
+# modules
+import os
 import re
 import sys
+import json
+import settings
+import argparse
+from flask import *
 
+# flask
 app = Flask(__name__)
-app.secret_key = '佐久間さん可愛い'
+app.secret_key = "neo-trainingassitant-2015"
 
-#画像の準備
-image_ptrn = re.compile('.*[.](jpg|jpeg|png|bmp|gif)$')
-image_dir = os.path.join( 'static', 'img' )
-images = []
-images = [ image for image in os.listdir( image_dir ) if re.match( image_ptrn, image ) ]
-if not len( images ):
-    sys.exit( 'Error: Could not find images')
+# variables
+count = -1
+flag_finished = False
 
-logf = open('log.dat', 'w')
+# data file for positive and negative
+pos_f = open("positive.dat", "a")
+neg_f = open("negative.dat", "a")
+log_f = open("log.dat", "w")
 
-pos = 0
+# preparation of images
+image_dir = os.path.join("static", "img")
+images = [x for x in os.listdir(image_dir) \
+            if x.split(".")[-1] \
+            in {"jpg","jpeg","png","bmp","gif"}]
 
-@app.route('/')
+if not len(images) > 0:
+    sys.exit("Error: Could not find images")
+
+
+@app.route("/")
 def index():
-    
-    global pos
-
-    #正例と負例用のファイル
-    global positive
-    global negative
-    
-    positive = open('info.dat', 'a')
-    negative = open('bg.txt', 'a')
-
-    #最初の画像
-    imgsrc = os.path.join( image_dir, images[pos] )
+    # variables
+    global count
+    global images
     imgnum = len(images)
-    count = pos
-    counter = ''.join( [ str(pos+1).zfill( len(str(imgnum)) ), ' of ', str(imgnum) ] )
-    
-    return render_template( 'index.html', imgsrc=imgsrc, imgnum=imgnum, count=count, counter=counter ) 
+    counter = "{0} of {1}".format(count+1, imgnum)
 
-@app.route('/_next')
+    # check finished
+    if not flag_finished:
+        if count < 0:
+            return render_template("index.html", \
+                               imgnum=imgnum, count=0, counter=counter)
+        elif count < imgnum:
+            imgsrc  = os.path.join(image_dir, images[count])
+            return render_template("index.html", imgsrc=imgsrc, \
+                               imgnum=imgnum, count=count, counter=counter)
+    else:
+        return "Error : Please don't reload after finished."
+
+
+@app.route("/_next")
 def _next():
+    # variables
+    global count
+    global images
+    global pos_f, neg_f, log_f
+    global flag_finished
 
-    global pos
+    # check whether skip image
+    skip = request.args.get("skip")
 
-    #その画像をスキップするか
-    skip = request.args.get('skip') 
-    
-    if skip == u'0':
-
-        #囲まれた範囲の座標
-        coords = request.args.get('coords')
+    if skip == "0":
+        # coords of enclosed area
+        coords = request.args.get("coords")
         coords = json.loads(coords)
 
-        #処理中の画像のパス
-        image_path = os.path.join( image_dir, images[pos] )
+        # path of current image
+        image_path = os.path.join(image_dir, images[count])
 
-        #正例か負例か
+        # check positive or negative
         if len(coords) == 0:
-            negative.write( ''.join( [ image_path, '\n' ] ) )
-            logf.write( ''.join( [ image_path, '\n' ] ) )
-            logf.flush()
-
+            s = "{0}\n".format(image_path)
+            neg_f.write(s)
+            log_f.write(s)
         else:
-            s = ''
+            tmp = ""
             for coord in coords:
-                s = '  '.join( [ s, ' '.join( [ str(int(e)) for e in coord ] ) ] )
-            
-            positive.write('%s  %d%s\n' % (image_path, len(coords), s))
-            logf.write( "%s %d%s\n" % (image_path, len(coords), s) )
-            logf.flush()
-    
-    #まだ画像があるか
-    if pos+1 >= len(images):
-        imgsrc = ""
-        finished = True
-        pos = pos + 1
-        logf.close()
-        negative.close()
-        positive.close()
+                tmp = "  ".join([tmp, " ".join([str(int(x)) for x in coord])])
+            s = "{0}  {1}{2}\n".format(image_path, len(coords), tmp)
+            pos_f.write(s)
+
+        log_f.flush()
+
+    # check existance of remaining
+    imgsrc = ""
+
+    if count+1 < len(images):
+        imgsrc = os.path.join(image_dir, images[count+1])
     else:
-        finished = False
-        imgsrc = os.path.join( image_dir, images[pos+1] )
-        pos = pos + 1
+        flag_finished = True
+        pos_f.close()
+        neg_f.close()
+        log_f.close()
 
-    return jsonify( imgsrc=imgsrc, finished=finished, count=pos ) 
+    count += 1
+    return jsonify(imgsrc=imgsrc, finished=flag_finished, count=count)
 
-if __name__ == '__main__':
+
+# main function
+if __name__ == "__main__":
+    # run flask
     app.debug = True
     app.run()
+

@@ -1,5 +1,5 @@
-settings.py.bak
-bg.txt
-info.dat
+__pycache__
+negative.dat
+positive.dat
 log.dat
 static/img/*
