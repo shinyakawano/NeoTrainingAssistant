@@ -10,19 +10,21 @@ var ratio;
 onload = function() {
     draw(undo=0);
 
-    $('#undo').click(function(){
+    $('#undo').on('click', function(){
         undo_status()
     });
-    $('#clear').click(function(){
-        if (confirm("Clear rectangles, OK?")) {
-            clear_status();
-        }
+    $('#clear').on('click', function(){
+        bootbox.confirm(
+            "Clear All Rectangle. Are you sure?",
+            function(result) {
+                clear_status();
+            });
     });
 
-    $('#skip').click(function(){
+    $('#skip').on('click', function(){
         next_ajax(skip=1);
-    })
-    $('#next').live('click', function(){
+    });
+    $('#next').on('click', function(){
         next_ajax(skip=0);
     });
 
@@ -35,9 +37,24 @@ function draw(undo) {
     var image = new Image();
     image.src = imgsrc;
     image.onload = function(){
-        var width  = image.naturalWidth;
-        var height = image.naturalHeight;
-        $('.main-wrapper').css({'width': width, 'minWidth': width});
+        var tmp_width  = this.width;
+        var tmp_height = this.height;
+        if (tmp_width > 800) {
+            tmp_height *= (800 / tmp_width);
+            tmp_width   = 800;
+        }
+        if (tmp_height > 450) {
+            tmp_width  *= (450 / tmp_height);
+            tmp_height  = 450;
+        }
+        ratio = tmp_width / this.width;
+
+        var width  = tmp_width;
+        var height = tmp_height;
+        $('.main-wrapper').css({
+            'width': width,
+            'minWidth': width
+        });
 
         var wrapper = $('#canvas-wrapper');
         $(wrapper).empty();
@@ -46,9 +63,14 @@ function draw(undo) {
 
         canvas = $('#cnvs').get(0);
         context = canvas.getContext('2d');
-        $('#cnvs').css({'width': width + 'px', 'height': height + 'px'}).attr(
-                {'width': width + 'px', 'height': height + 'px'});
-        context.drawImage(image, 0, 0);
+        $('#cnvs').css({
+            'width' : width  + 'px',
+            'height': height + 'px'
+        }).attr({
+            'width' : width  + 'px',
+            'height': height + 'px'
+        });
+        context.drawImage(this, 0, 0, this.width, this.height, 0, 0, width, height);
 
         if (undo == 1) {
             for (var i=0; i<coords.length; i++) {
@@ -72,7 +94,7 @@ function draw(undo) {
 }
 
 function selected(c) {
-    curr_crd = [c.x, c.y, c.w, c.h];
+    curr_crd = [c.x, c.y, c.w, c.h, ratio];
 }
 
 function released(c) {
@@ -96,7 +118,7 @@ function undo_status() {
 }
 
 function next_ajax(skip) {
-    console.log("coords : " + coords);
+    //console.log("coords : " + coords);
     coords = JSON.stringify(coords);
 
     $.ajax({
@@ -110,14 +132,15 @@ function next_ajax(skip) {
             var count = data.count;
             var finished = data.finished;
             $('.bar').css({'width': count*100/imgnum + '%'});
-            console.log(count + '/' + imgnum);
+            //console.log(count + '/' + imgnum);
 
             if (finished) {
                 w = $('.head-wrapper').width()
                 $('.main-wrapper').css({'width': w, 'minWidth': w});
                 $('#canvas-wrapper').empty().append('<div class="message">'
-                    + imgnum + ' images were successfully processed!</div>');
+                    + imgnum + ' images were <br />successfully processed!</div>');
                 $('.btn').addClass('disabled');
+                $('#clear').off('click');
             } else {
                 var tmp = (count+1).toString();
                 while(tmp.length < imgnum.toString.length){

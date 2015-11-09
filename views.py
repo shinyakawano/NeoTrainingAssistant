@@ -64,7 +64,7 @@ def _next():
     # check whether skip image
     skip = request.args.get("skip")
 
-    if skip == "0":
+    if skip == "0" and not flag_finished :
         # coords of enclosed area
         coords = request.args.get("coords")
         coords = json.loads(coords)
@@ -80,7 +80,8 @@ def _next():
         else:
             tmp = ""
             for coord in coords:
-                tmp = "  ".join([tmp, " ".join([str(int(x)) for x in coord])])
+                pos_list = [str(int(x/coord[-1])) for x in coord[:-1]]
+                tmp = "  ".join([tmp, " ".join(pos_list)])
             s = "{0}  {1}{2}\n".format(image_path, len(coords), tmp)
             pos_f.write(s)
 
