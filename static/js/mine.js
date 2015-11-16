@@ -5,27 +5,58 @@ var canvas;
 var context;
 var ratio;
 
+var limit_upper_width;
+var limit_upper_height;
+var limit_lower_width;
+var limit_lower_height;
+
+var alert_click_clear;
+var alert_click_skip;
+var alert_click_next;
+
 
 // onload
 onload = function() {
-    draw(undo=0);
+    draw(redraw=0);
 
     $('#undo').on('click', function(){
-        undo_status()
+        coords.pop();
+        draw(redraw=1);
     });
     $('#clear').on('click', function(){
-        bootbox.confirm(
-            "Clear All Rectangle. Are you sure?",
-            function(result) {
-                clear_status();
-            });
+        if (alert_click_clear) {
+            bootbox.confirm(
+                "Clear all rectangles. Are you OK?",
+                function(result) {
+                    coords = new Array();
+                    draw(redraw=0);
+                });
+        } else {
+            coords = new Array();
+            draw(redraw=0);
+        }
     });
 
     $('#skip').on('click', function(){
-        next_ajax(skip=1);
+        if (coords.length == 0) {
+            next_ajax(skip=1);
+        } else {
+            if (alert_click_skip) {
+                bootbox.alert("To use 'skip', please 'clear' all rectanges.");
+            }
+        }
     });
     $('#next').on('click', function(){
-        next_ajax(skip=0);
+        if (coords.length > 0) {
+            next_ajax(skip=0);
+        } else {
+            if (alert_click_next) {
+                bootbox.alert("There is nothing to crop, please click 'skip'.");
+            }
+        }
+    });
+    $('#back').on('click', function(){
+        back_ajax();
     });
 
     $('.bar').css({'width': count*100/imgnum + '%'});
@@ -33,20 +64,34 @@ onload = function() {
 
 
 // functions
-function draw(undo) {
+function draw(redraw) {
     var image = new Image();
     image.src = imgsrc;
+
     image.onload = function(){
         var tmp_width  = this.width;
         var tmp_height = this.height;
-        if (tmp_width > 800) {
-            tmp_height *= (800 / tmp_width);
-            tmp_width   = 800;
+
+        // extend
+        if (tmp_width < limit_lower_width) {
+            tmp_height *= (limit_lower_width / tmp_width)
+            tmp_width   = limit_lower_width
         }
-        if (tmp_height > 450) {
-            tmp_width  *= (450 / tmp_height);
-            tmp_height  = 450;
+        if (tmp_height < limit_lower_height) {
+            tmp_width  *= (limit_lower_height / tmp_height);
+            tmp_height  = limit_lower_height
         }
+
+        // shrink
+        if (tmp_width > limit_upper_width) {
+            tmp_height *= (limit_upper_width / tmp_width);
+            tmp_width   = limit_upper_width;
+        }
+        if (tmp_height > limit_upper_height) {
+            tmp_width  *= (limit_upper_height / tmp_height);
+            tmp_height  = limit_upper_height;
+        }
+
         ratio = tmp_width / this.width;
 
         var width  = tmp_width;
@@ -72,7 +117,7 @@ function draw(undo) {
         });
         context.drawImage(this, 0, 0, this.width, this.height, 0, 0, width, height);
 
-        if (undo == 1) {
+        if (redraw == 1) {
             for (var i=0; i<coords.length; i++) {
                 var curr_crd = coords[i];
                 context.beginPath();
@@ -107,18 +152,7 @@ function released(c) {
             curr_crd[2], curr_crd[3]);
 }
 
-function clear_status() {
-    coords = new Array();
-    draw(undo=0);
-}
-
-function undo_status() {
-    coords.pop();
-    draw(undo=1);
-}
-
 function next_ajax(skip) {
-    //console.log("coords : " + coords);
     coords = JSON.stringify(coords);
 
     $.ajax({
@@ -129,10 +163,22 @@ function next_ajax(skip) {
 
         success: function (data) {
             imgsrc = data.imgsrc;
+            coords = data.coords;
+
+            console.log(coords);
+
+            limit_upper_width  = data.size[0];
+            limit_upper_height = data.size[1];
+            limit_lower_width  = data.size[2];
+            limit_lower_height = data.size[3];
+
+            alert_click_clear = data.alert[0];
+            alert_click_skip  = data.alert[1];
+            alert_click_next  = data.alert[2];
+
             var count = data.count;
             var finished = data.finished;
             $('.bar').css({'width': count*100/imgnum + '%'});
-            //console.log(count + '/' + imgnum);
 
             if (finished) {
                 w = $('.head-wrapper').width()
@@ -147,11 +193,50 @@ function next_ajax(skip) {
                     tmp = '0' + tmp;
                 }
                 $('.count').html(tmp + ' of ' + imgnum);
-                clear_status();
+
             }
+
+            draw(redraw=1);
         }
 
     });
 
 }
 
+
+function back_ajax() {
+    $.ajax({
+        type: "GET",
+        dataType: "json",
+        url: "/_back",
+
+        success: function (data) {
+            imgsrc = data.imgsrc;
+            coords = new Array();
+            coords = data.coords;
+
+            limit_upper_width  = data.size[0];
+            limit_upper_height = data.size[1];
+            limit_lower_width  = data.size[2];
+            limit_lower_height = data.size[3];
+
+            alert_click_clear = data.alert[0];
+            alert_click_skip  = data.alert[1];
+            alert_click_next  = data.alert[2];
+
+            var count = data.count;
+            var finished = data.finished;
+            $('.bar').css({'width': count*100/imgnum + '%'});
+
+            var tmp = (count+1).toString();
+            while(tmp.length < imgnum.toString.length){
+                tmp = '0' + tmp;
+            }
+            $('.count').html(tmp + ' of ' + imgnum);
+
+            draw(redraw=1);
+        }
+
+    });
+
+}
