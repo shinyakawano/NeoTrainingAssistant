@@ -2,4 +2,6 @@ __pycache__
 negative.dat
 positive.dat
 log.dat
-static/img/*
+static/img
+static/img_crop
+static/img_trim
