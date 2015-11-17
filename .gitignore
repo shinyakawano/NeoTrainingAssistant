@@ -1,7 +1,8 @@
 __pycache__
-negative.dat
-positive.dat
-log.dat
+*.dat
+*.dat~
+*.json
+*.json~
 static/img
 static/img_crop
 static/img_trim
