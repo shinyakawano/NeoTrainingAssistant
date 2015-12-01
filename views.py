@@ -17,18 +17,16 @@ app.secret_key = "neo-trainingassitant-2015"
 
 
 # settings
-size = [
-    settings.limit_upper_width,
-    settings.limit_upper_height,
-    settings.limit_lower_width,
-    settings.limit_lower_height
-]
-
-alert = [
-    settings.alert_click_clear,
-    settings.alert_click_skip,
-    settings.alert_click_next
-]
+config = {
+    "aspect_ratio"       : settings.aspect_ratio,
+    "limit_upper_width"  : settings.limit_upper_width,
+    "limit_upper_height" : settings.limit_upper_height,
+    "limit_lower_width"  : settings.limit_lower_width,
+    "limit_lower_height" : settings.limit_lower_height,
+    "alert_click_clear"  : settings.alert_click_clear,
+    "alert_click_skip"   : settings.alert_click_skip,
+    "alert_click_next"   : settings.alert_click_next
+}
 
 interval = 5
 if type(settings.report_dump_interval) in {int, float}:
@@ -137,8 +135,7 @@ def _next():
     global flag_finished
     global crop_path
     global report_path
-    global size
-    global alert
+    global config
     global interval
 
     skip = request.args.get("skip")
@@ -161,26 +158,26 @@ def _next():
         # check positive or negative
         if len(coords) == 0:
             data = {
-                "type": "negative",
-                "path": image_path,
-                "coords": []
+                "type"   : "negative",
+                "path"   : image_path,
+                "coords" : []
             }
             records[count] = data
 
         else:
             data = {
-                "type": "positive",
-                "path": image_path,
-                "coords": coords
+                "type"   : "positive",
+                "path"   : image_path,
+                "coords" : coords
             }
             records[count] = data
 
     elif skip == "1" and not flag_finished:
         if count >= 0:
             data = {
-                "type": "negative",
-                "path": image_path,
-                "coords": []
+                "type"   : "negative",
+                "path"   : image_path,
+                "coords" : []
             }
             records[count] = data
 
@@ -189,11 +186,11 @@ def _next():
     if settings.flag_report_dump:
         if (count+1) != 0 and (count+1) % interval == 0:
             data = {
-                "input_path": input_path,
-                "crop_path": crop_path,
-                "records": records,
-                "images": images,
-                "count": count + 1
+                "input_path" : input_path,
+                "crop_path"  : crop_path,
+                "records"    : records,
+                "images"     : images,
+                "count"      : count + 1
             }
             dump_report(report_path, data)
 
@@ -217,14 +214,13 @@ def _next():
     count += 1
 
     return jsonify(imgsrc=imgsrc, finished=flag_finished, \
-                    count=count, coords=coords, size=size, alert=alert)
+                    count=count, coords=coords, config=config)
 
 
 @app.route("/_back")
 def _back():
     global count
-    global size
-    global alert
+    global config
 
     imgsrc = ""
     coords = []
@@ -235,7 +231,7 @@ def _back():
         coords = records[count]["coords"]
 
     return jsonify(imgsrc=imgsrc, finished=False, \
-                    count=count, coords=coords, size=size, alert=alert)
+                    count=count, coords=coords, config=config)
 
 
 # main function
@@ -265,8 +261,8 @@ if __name__ == "__main__":
 
     root_path   = os.path.dirname(script_path)
     report_path = os.path.join(root_path, "report.json")
-    input_path  = ""; input_relpath = ""
-    crop_path   = ""; crop_relpath  = ""
+    input_path  = "";  input_relpath = ""
+    crop_path   = "";  crop_relpath  = ""
 
     # parsing of argument
     desc_str = "This program for creation of OpenCV annotation data."
