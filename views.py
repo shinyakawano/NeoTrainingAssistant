@@ -5,15 +5,20 @@ import os
 import re
 import sys
 import json
+import shutil
 import settings
 import argparse
 from flask import *
 from PIL import Image
+from datetime import datetime
 
 
 # global variables
 app = Flask(__name__)
 app.secret_key = "neo-trainingassitant-2015"
+
+ttime = datetime.now()
+datestr = ttime.strftime("%Y%m%d%H%M%S")
 
 
 # settings
@@ -49,8 +54,22 @@ def load_report(report_path):
     return data
 
 
+def crop_image(src, dst, coord):
+    coord = [int(x/coord[-1]) for x in coord[:-1]]
+    img = Image.open(src)
+
+    x = coord[0]
+    y = coord[1]
+    w = x + coord[2]
+    h = y + coord[3]
+
+    img.crop((x, y, w, h)).save(dst)
+    return
+
+
 def create_annotation(path, records):
     global root_path
+    global copy_relpath
 
     pos_f = open(os.path.join(path, "positive.dat"), "w")
     neg_f = open(os.path.join(path, "negative.dat"), "w")
@@ -60,11 +79,19 @@ def create_annotation(path, records):
         os.makedirs(path)
 
     for item in records:
-        tmp_path = os.path.join(root_path, item["path"])
+        fname = os.path.basename(item["path"])
+        tmp_path = os.path.join(copy_relpath, fname)
 
         if item["type"] == "positive":
             tmp = ""
-            for coord in item["coords"]:
+            for i, coord in enumerate(item["coords"]):
+                if settings.flag_save_crop:
+                    root, ext = os.path.splitext(tmp_path)
+                    fname = "{0}_{1}{2}".format(os.path.basename(root), i+1, ext)
+                    dst = os.path.join(crop_path, fname)
+                    print(dst)
+                    crop_image(item["path"], dst, coord)
+
                 coord_list = [str(int(x/coord[-1])) for x in coord[:-1]]
                 tmp = "  ".join([tmp, " ".join(coord_list)])
 
@@ -81,18 +108,6 @@ def create_annotation(path, records):
     pos_f.close()
     neg_f.close()
     log_f.close()
-
-    return
-
-
-def crop_images(path, records):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    for item in records:
-        if item["type"] == "positve":
-            print(item)
-
     return
 
 
@@ -124,8 +139,11 @@ def index():
                        imgnum=imgnum, count=count, counter=counter)
 
     else:
-        sys.exit(0)
-        #return "Error: Please don't reload after finished."
+        if os.path.exists(report_path):
+            os.remove(report_path)
+
+        return "Error: Please don't reload after finished."
+        #sys.exit(0)
 
 
 @app.route("/_next")
@@ -133,19 +151,21 @@ def _next():
     global count
     global images
     global flag_finished
+    global dst_path
     global crop_path
+    global copy_path; copy_relpath
     global report_path
     global config
     global interval
 
     skip = request.args.get("skip")
-    image_path = ""
+    img_path = ""
 
     try:
         if count >= len(images):
-            image_path = images[-1]
+            img_path = images[-1]
         else:
-            image_path = images[count]
+            img_path = images[count]
     except NameError:
         count = -1
 
@@ -159,7 +179,7 @@ def _next():
         if len(coords) == 0:
             data = {
                 "type"   : "negative",
-                "path"   : image_path,
+                "path"   : img_path,
                 "coords" : []
             }
             records[count] = data
@@ -167,7 +187,7 @@ def _next():
         else:
             data = {
                 "type"   : "positive",
-                "path"   : image_path,
+                "path"   : img_path,
                 "coords" : coords
             }
             records[count] = data
@@ -176,7 +196,7 @@ def _next():
         if count >= 0:
             data = {
                 "type"   : "negative",
-                "path"   : image_path,
+                "path"   : img_path,
                 "coords" : []
             }
             records[count] = data
@@ -186,11 +206,13 @@ def _next():
     if settings.flag_report_dump:
         if (count+1) != 0 and (count+1) % interval == 0:
             data = {
-                "input_path" : input_path,
-                "crop_path"  : crop_path,
-                "records"    : records,
-                "images"     : images,
-                "count"      : count + 1
+                "src_path"  : src_path,
+                "dst_path"  : dst_path,
+                "crop_path" : crop_path,
+                "copy_path" : copy_path,
+                "records"   : records,
+                "images"    : images,
+                "count"     : count + 1
             }
             dump_report(report_path, data)
 
@@ -201,15 +223,26 @@ def _next():
     if count+1 < len(images):
         imgsrc = images[count+1]
         coords = records[count+1]["coords"]
+
     elif count+1 == len(images):
         flag_finished = True
-        create_annotation(input_path, records)
-        if settings.flag_save_crop:
-            crop_images(crop_path, records)
-        print(report_path)
+
+        if not os.path.exists(dst_path):
+            os.makedirs(dst_path)
+
+        if not os.path.exists(copy_path):
+            shutil.copytree(src_path, copy_path)
+            if settings.flag_remove_src:
+                os.remove(src_path)
+                os.makedirs(src_path)
+
+        if not os.path.exists(crop_path):
+            os.makedirs(crop_path)
+
+        create_annotation(dst_path, records)
+
         if os.path.exists(report_path):
             os.remove(report_path)
-
 
     count += 1
 
@@ -242,8 +275,10 @@ if __name__ == "__main__":
 
     global root_path
     global report_path
-    global input_path; global input_relpath;
-    global crop_path;  global crop_relpath;
+    global src_path;  global src_relpath
+    global dst_path;  global dst_relpath
+    global crop_path
+    global copy_path; global copy_relpath
 
     global images
     global records
@@ -261,40 +296,46 @@ if __name__ == "__main__":
 
     root_path   = os.path.dirname(script_path)
     report_path = os.path.join(root_path, "report.json")
-    input_path  = "";  input_relpath = ""
-    crop_path   = "";  crop_relpath  = ""
+    src_path  = "";  src_relpath  = ""
+    dst_path  = "";  dst_relpath  = ""
+    crop_path = ""
+    copy_path = ""
 
     # parsing of argument
     desc_str = "This program for creation of OpenCV annotation data."
     parser = argparse.ArgumentParser(description=desc_str)
-    parser.add_argument("-d", "--imgpath",  help="Path of input directory")
-    parser.add_argument("-s", "--croppath", help="Path of output directory")
+    parser.add_argument("-s", "--srcpath", help="Path of input directory")
+    parser.add_argument("-d", "--dstpath", help="Path of output directory")
 
     args = parser.parse_args()
-    if args.imgpath is None:
-        input_path = os.path.join(root_path, "static/img")
+    if args.srcpath is None:
+        src_path = os.path.join(root_path, "static/img")
     else:
-        input_path = os.path.join(os.getcwd(), args.imgpath)
-        input_path = os.path.abspath(input_path)
+        src_path = os.path.join(os.getcwd(), args.srcpath)
+        src_path = os.path.abspath(src_path)
 
-    if args.croppath is None:
-        head, tail  = os.path.split(input_path)
-        crop_path = os.path.join(head, "{0}_crop".format(tail))
+    if args.dstpath is None:
+        head, tail = os.path.split(src_path)
+        dst_path  = os.path.join(head, "{0}_dst/{1}".format(tail, datestr))
     else:
-        crop_path = os.path.join(os.getcwd(), args.croppath)
-        crop_path = os.path.abspath(crop_path)
+        dst_path = os.path.join(os.getcwd(), args.dstpath)
+        dst_path = os.path.abspath(dst_path)
 
-    if not os.path.exists(input_path):
+    crop_path = os.path.join(dst_path, "{0}_crop".format(tail))
+    copy_path = os.path.join(dst_path, "img")
+
+    if not os.path.exists(src_path):
         print("Error: Input path not found.")
         sys.exit(1)
 
-    input_relpath = os.path.relpath(input_path, root_path)
-    crop_relpath  = os.path.relpath(crop_path,  root_path)
+    src_relpath  = os.path.relpath(src_path, root_path)
+    dst_relpath  = os.path.relpath(dst_path, root_path)
+    copy_relpath = os.path.relpath(copy_path, dst_path)
 
 
     # preparation of images
-    images = [os.path.join(input_relpath, x)
-                for x in sorted(os.listdir(input_relpath))
+    images = [os.path.join(src_relpath, x)
+                for x in sorted(os.listdir(src_relpath))
                 if x.split(".")[-1]
                 in {"jpg","jpeg","png","bmp","gif"}]
 
@@ -302,27 +343,34 @@ if __name__ == "__main__":
         sys.exit("Error: Images not found.")
     else:
         records = [{
-            "input_path": "",
-            "crop_path": "",
-            "coords": []
+            "type"   : "",
+            "path"   : "",
+            "coords" : []
         }] * len(images)
 
 
     # load report data
     if os.path.exists(report_path):
         data = load_report(report_path)
-        input_path = data["input_path"]
-        crop_path  = data["crop_path"]
-        records    = data["records"]
-        images     = data["images"]
-        next_count = data["count"]
-        flag_skip = True
+        if data["count"] < len(images):
+            src_path   = data["src_path"]
+            dst_path   = data["dst_path"]
+            crop_path  = data["crop_path"]
+            copy_path  = data["copy_path"]
+            records    = data["records"]
+            images     = data["images"]
+            next_count = data["count"]
+            flag_skip  = True
+        else:
+            os.remove(report_path)
+
 
     # show path
-    print("\nInput image Path : {0}".format(os.path.abspath(input_path)))
-    print("Annotation file Path : {0}".format(os.path.abspath(input_path)))
+    print("\nSource Path : {0}".format(os.path.abspath(src_path)))
+    print("Destination Path : {0}".format(os.path.abspath(dst_path)))
     if settings.flag_save_crop:
-        print("Cropped Image Path : {0}\n".format(os.path.abspath(crop_path)))
+        print("Cropped image Path : {0}".format(os.path.abspath(crop_path)))
+    print()
 
     # run flask
     app.run(

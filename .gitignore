@@ -6,3 +6,4 @@ __pycache__
 static/img
 static/img_crop
 static/img_trim
+static/img_dst

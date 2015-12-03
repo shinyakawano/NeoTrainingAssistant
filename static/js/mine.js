@@ -4,6 +4,7 @@ var curr_crd;
 var canvas;
 var context;
 var ratio;
+var flag_first = false;
 
 var config = {
     "aspect_ratio"       : 0,
@@ -40,12 +41,19 @@ onload = function() {
     });
 
     $('#skip').on('click', function(){
-        if (coords.length == 0) {
-            next_ajax(skip=1);
-        } else {
+        if (coords.length == 0 && flag_first) {
             if (config["alert_click_skip"]) {
-                bootbox.alert("To use 'skip', please 'clear' all rectanges.");
+                bootbox.confirm(
+                "Skip this image. Are you OK?",
+                function(result) {
+                    next_ajax(skip=1);
+                });
+            } else {
+                next_ajax(skip=1);
             }
+        } else {
+            next_ajax(skip=1);
+            flag_first = true;
         }
     });
     $('#next').on('click', function(){
