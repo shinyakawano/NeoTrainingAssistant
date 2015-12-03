@@ -11,15 +11,15 @@ report_dump_interval = 5
 flag_remove_src = False
 
 # crop ratio (width / height)
-# if you want make this ratio free, set 0
+# if you want make ratio free, set 0
 # or you want square, set 1
 aspect_ratio = 0
 
 # image-size limit in main window
-limit_upper_width  = 600
-limit_upper_height = 450
-limit_lower_width  = 400
-limit_lower_height = 300
+limit_upper_width  = 800
+limit_upper_height = 600
+limit_lower_width  = 500
+limit_lower_height = 375
 
 # button alert
 alert_click_clear = True    # when push 'Clear'

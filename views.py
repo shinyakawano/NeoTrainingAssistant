@@ -89,7 +89,6 @@ def create_annotation(path, records):
                     root, ext = os.path.splitext(tmp_path)
                     fname = "{0}_{1}{2}".format(os.path.basename(root), i+1, ext)
                     dst = os.path.join(crop_path, fname)
-                    print(dst)
                     crop_image(item["path"], dst, coord)
 
                 coord_list = [str(int(x/coord[-1])) for x in coord[:-1]]
@@ -233,7 +232,7 @@ def _next():
         if not os.path.exists(copy_path):
             shutil.copytree(src_path, copy_path)
             if settings.flag_remove_src:
-                os.remove(src_path)
+                shutil.rmtree(src_path)
                 os.makedirs(src_path)
 
         if not os.path.exists(crop_path):

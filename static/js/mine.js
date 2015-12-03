@@ -10,10 +10,10 @@ var config = {
     "aspect_ratio"       : 0,
     "limit_upper_width"  : 800,
     "limit_upper_height" : 600,
-    "limit_lower_width"  : 200,
-    "limit_lower_height" : 150,
+    "limit_lower_width"  : 500,
+    "limit_lower_height" : 375,
     "alert_click_clear"  : true,
-    "alert_click_skip"   : true,
+    "alert_click_skip"   : false,
     "alert_click_next"   : false
 };
 
