@@ -30,6 +30,7 @@ config = {
     "limit_lower_height"  : settings.limit_lower_height,
     "alert_click_clear"   : settings.alert_click_clear,
     "alert_click_overall" : settings.alert_click_overall,
+    "alert_click_dismiss" : settings.alert_click_dismiss,
     "alert_click_skip"    : settings.alert_click_skip,
     "alert_click_next"    : settings.alert_click_next
 }
@@ -120,6 +121,7 @@ def index():
     global flag_skip
     global images
     global records
+    global interval
 
     count = -1
     imgnum = len(images)
@@ -129,7 +131,10 @@ def index():
     if not flag_finished:
         if count < 0:
             if flag_skip:
-                count = next_count - 1
+                if next_count - 2 > 0:
+                    count = next_count - 2
+                else:
+                    count = next_count - 1
             return render_template("index.html", imgsrc="", \
                        imgnum=imgnum, count=0, counter=counter)
 
@@ -196,6 +201,15 @@ def _next():
         if count >= 0:
             data = {
                 "type"   : "negative",
+                "path"   : img_path,
+                "coords" : []
+            }
+            records[count] = data
+
+    elif skip == "2" and not flag_finished:
+        if count >= 0:
+            data = {
+                "type"   : "dismissed",
                 "path"   : img_path,
                 "coords" : []
             }

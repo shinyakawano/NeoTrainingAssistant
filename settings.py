@@ -16,13 +16,14 @@ flag_remove_src = False
 aspect_ratio = 0
 
 # image-size limit in main window
-limit_upper_width  = 800
-limit_upper_height = 600
-limit_lower_width  = 500
-limit_lower_height = 375
+limit_upper_width  = 600
+limit_upper_height = 450
+limit_lower_width  = 400
+limit_lower_height = 300
 
 # button alert
-alert_click_clear   = True      # when push 'Clear'
-alert_click_overall = True      # when push 'Overall'
-alert_click_skip    = False     # when push 'Skip'
-alert_click_next    = False     # when push 'Next'
+alert_click_clear   = True      # when click 'Clear'
+alert_click_overall = True      # when click 'Overall'
+alert_click_dismiss = True      # when click 'Dismiss'
+alert_click_skip    = False     # when click 'Skip'
+alert_click_next    = False     # when click 'Next'

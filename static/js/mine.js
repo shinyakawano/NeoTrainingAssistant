@@ -8,12 +8,13 @@ var flag_first = false;
 
 var config = {
     "aspect_ratio"        : 0,
-    "limit_upper_width"   : 800,
-    "limit_upper_height"  : 600,
-    "limit_lower_width"   : 500,
-    "limit_lower_height"  : 375,
+    "limit_upper_width"   : 600,
+    "limit_upper_height"  : 450,
+    "limit_lower_width"   : 400,
+    "limit_lower_height"  : 300,
     "alert_click_clear"   : true,
     "alert_click_overall" : true,
+    "alert_click_dismiss" : true,
     "alert_click_skip"    : false,
     "alert_click_next"    : false
 };
@@ -51,6 +52,10 @@ onload = function() {
         }
     });
 
+    $('#back').on('click', function(){
+        back_ajax();
+    });
+
     $('#skip').on('click', function(){
         if (coords.length == 0 && flag_first) {
             if (config["alert_click_skip"]) {
@@ -67,6 +72,19 @@ onload = function() {
             flag_first = true;
         }
     });
+
+    $('#dismiss').on('click', function(){
+       if (config["alert_click_dismiss"]) {
+                bootbox.confirm(
+                "Dismiss this image. Are you OK?",
+                function(result) {
+                    next_ajax(skip=2);
+                });
+       } else {
+            next_ajax(skip=2);
+       }
+    });
+
     $('#next').on('click', function(){
         if (coords.length > 0) {
             next_ajax(skip=0);
@@ -75,9 +93,6 @@ onload = function() {
                 bootbox.alert("There is nothing to crop, please click 'skip'.");
             }
         }
-    });
-    $('#back').on('click', function(){
-        back_ajax();
     });
 
     $('.bar').css({'width': count*100/imgnum + '%'});
@@ -213,6 +228,7 @@ function next_ajax(skip) {
 
             config["alert_click_clear"]   = data.config["alert_click_clear"];
             config["alert_click_overall"] = data.config["alert_click_overall"];
+            config["alert_click_dismiss"] = data.config["alert_click_dismiss"];
             config["alert_click_skip"]    = data.config["alert_click_skip"];
             config["alert_click_next"]    = data.config["alert_click_next"];
 
@@ -263,6 +279,7 @@ function back_ajax() {
 
             config["alert_click_clear"]   = data.config["alert_click_clear"];
             config["alert_click_overall"] = data.config["alert_click_overall"];
+            config["alert_click_dismiss"] = data.config["alert_click_dismiss"];
             config["alert_click_skip"]    = data.config["alert_click_skip"];
             config["alert_click_next"]    = data.config["alert_click_next"];
 
