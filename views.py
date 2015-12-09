@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import json
+import time
 import shutil
 import settings
 import argparse
@@ -13,49 +14,7 @@ from PIL import Image
 from datetime import datetime
 
 
-# global variables
-app = Flask(__name__)
-app.secret_key = "neo-trainingassitant-2015"
-
-ttime = datetime.now()
-datestr = ttime.strftime("%Y%m%d%H%M%S")
-
-
-# settings
-config = {
-    "aspect_ratio"        : settings.aspect_ratio,
-    "limit_upper_width"   : settings.limit_upper_width,
-    "limit_upper_height"  : settings.limit_upper_height,
-    "limit_lower_width"   : settings.limit_lower_width,
-    "limit_lower_height"  : settings.limit_lower_height,
-    "alert_click_clear"   : settings.alert_click_clear,
-    "alert_click_overall" : settings.alert_click_overall,
-    "alert_click_dismiss" : settings.alert_click_dismiss,
-    "alert_click_skip"    : settings.alert_click_skip,
-    "alert_click_next"    : settings.alert_click_next
-}
-
-interval = 5
-if type(settings.report_dump_interval) in {int, float}:
-    interval = int(settings.report_dump_interval)
-
-
 # functions
-def dump_report(report_path, data):
-    f = open(report_path, "w")
-    json_data = json.dumps(data)
-    f.write(json_data)
-    f.close()
-    return
-
-
-def load_report(report_path):
-    f = open(report_path, "r")
-    data = json.load(f)
-    f.close()
-    return data
-
-
 def crop_image(src, dst, coord):
     coord = [int(x/coord[-1]) for x in coord[:-1]]
     img = Image.open(src)
@@ -113,35 +72,145 @@ def create_annotation(path, records):
 
 
 
+# settings
+config = {
+    "aspect_ratio"        : settings.aspect_ratio,
+    "limit_upper_width"   : settings.limit_upper_width,
+    "limit_upper_height"  : settings.limit_upper_height,
+    "limit_lower_width"   : settings.limit_lower_width,
+    "limit_lower_height"  : settings.limit_lower_height,
+    "alert_click_clear"   : settings.alert_click_clear,
+    "alert_click_overall" : settings.alert_click_overall,
+    "alert_click_dismiss" : settings.alert_click_dismiss,
+    "alert_click_skip"    : settings.alert_click_skip,
+    "alert_click_next"    : settings.alert_click_next
+}
+
+interval = 5
+if type(settings.report_dump_interval) in {int, float}:
+    interval = int(settings.report_dump_interval)
+
+
+# flask
+app = Flask(__name__)
+app.secret_key = "neo-trainingassitant-2015"
+
+# variables
+images = []
+records = []
+flag_resume = False
+flag_finished = False
+count = -1
+next_count = 0
+
+# time
+ttime = datetime.now()
+datestr = ttime.strftime("%Y%m%d%H%M%S")
+
+# file path
+try:
+    script_path = os.path.realpath(__file__)
+except:
+    script_path = os.path.realpath('__file__')
+
+root_path   = os.path.dirname(script_path)
+report_path = os.path.join(root_path, "report.json")
+src_path  = "";  src_relpath  = ""
+dst_path  = "";  dst_relpath  = ""
+copy_path = "";  crop_rel_path = ""
+crop_path = ""
+
+# parsing of argument
+desc_str = "This program for creation of OpenCV annotation data."
+parser = argparse.ArgumentParser(description=desc_str)
+parser.add_argument("-s", "--srcpath", help="Path of input directory")
+parser.add_argument("-d", "--dstpath", help="Path of output directory")
+
+args = parser.parse_args()
+if args.srcpath is None:
+    src_path = os.path.join(root_path, "static/img")
+else:
+    src_path = os.path.join(os.getcwd(), args.srcpath)
+    src_path = os.path.abspath(src_path)
+
+if args.dstpath is None:
+    head, tail = os.path.split(src_path)
+    dst_path  = os.path.join(head, "{0}_dst/{1}".format(tail, datestr))
+else:
+    dst_path = os.path.join(os.getcwd(), args.dstpath)
+    dst_path = os.path.abspath(dst_path)
+
+crop_path = os.path.join(dst_path, "{0}_crop".format(tail))
+copy_path = os.path.join(dst_path, "img")
+
+if not os.path.exists(src_path):
+    print("Error: Input path not found.")
+    sys.exit(1)
+
+src_relpath  = os.path.relpath(src_path, root_path)
+dst_relpath  = os.path.relpath(dst_path, root_path)
+copy_relpath = os.path.relpath(copy_path, dst_path)
+
+
+# preparation of images
+# load report data
+if os.path.exists(report_path):
+
+    # open json-file
+    f = open(report_path, "r")
+    data = json.load(f)
+    f.close()
+
+    # get data
+    src_path   = data["src_path"]
+    dst_path   = data["dst_path"]
+    crop_path  = data["crop_path"]
+    copy_path  = data["copy_path"]
+    records    = data["records"]
+    images     = data["images"]
+    next_count = data["count"]
+    flag_resume = True
+
+else:
+    images = [os.path.join(src_relpath, x)
+            for x in sorted(os.listdir(src_relpath))
+            if x.split(".")[-1]
+            in {"jpg","jpeg","png","bmp","gif"}]
+
+    if not len(images) > 0:
+        sys.exit("Error: Images not found.")
+    else:
+        records = [{
+            "type"   : "",
+            "path"   : "",
+            "coords" : []
+        }] * len(images)
+
+img_num = len(images)
+
+
+
 # flask views
 @app.route("/")
 def index():
     global count
     global next_count
-    global flag_skip
     global images
     global records
     global interval
+    global img_num
 
-    count = -1
-    imgnum = len(images)
-    counter = "{0} of {1}".format(count+1, imgnum)
+    counter = "{0} of {1}".format(count+1, img_num)
 
     # check finished
     if not flag_finished:
+        imgsrc = ""
         if count < 0:
-            if flag_skip:
-                if next_count - 2 > 0:
-                    count = next_count - 2
-                else:
-                    count = next_count - 1
-            return render_template("index.html", imgsrc="", \
-                       imgnum=imgnum, count=0, counter=counter)
-
-        elif count < imgnum:
+            count = next_count-1
+        else:
             imgsrc = images[count]
-            return render_template("index.html", imgsrc=imgsrc, \
-                       imgnum=imgnum, count=count, counter=counter)
+        return render_template("index.html", imgsrc=imgsrc, \
+                   imgnum=img_num, count=count, counter=counter)
 
     else:
         if os.path.exists(report_path):
@@ -156,6 +225,7 @@ def _next():
     global count
     global images
     global flag_finished
+    global flag_resume
     global dst_path
     global crop_path
     global copy_path; copy_relpath
@@ -198,13 +268,14 @@ def _next():
             records[count] = data
 
     elif skip == "1" and not flag_finished:
-        if count >= 0:
+        if count >= 0 and not flag_resume:
             data = {
                 "type"   : "negative",
                 "path"   : img_path,
                 "coords" : []
             }
             records[count] = data
+            flag_resume = False
 
     elif skip == "2" and not flag_finished:
         if count >= 0:
@@ -218,17 +289,21 @@ def _next():
 
     # dump report
     if settings.flag_report_dump:
-        if (count+1) != 0 and (count+1) % interval == 0:
-            data = {
-                "src_path"  : src_path,
-                "dst_path"  : dst_path,
-                "crop_path" : crop_path,
-                "copy_path" : copy_path,
-                "records"   : records,
-                "images"    : images,
-                "count"     : count + 1
-            }
-            dump_report(report_path, data)
+        data = {
+            "src_path"  : src_path,
+            "dst_path"  : dst_path,
+            "crop_path" : crop_path,
+            "copy_path" : copy_path,
+            "records"   : records,
+            "images"    : images,
+            "count"     : count
+        }
+
+        f = open(report_path, "w")
+        json_data = json.dumps(data)
+        f.write(json_data)
+        f.close()
+
 
     # check existance of remaining
     imgsrc = ""
@@ -283,102 +358,6 @@ def _back():
 
 # main function
 if __name__ == "__main__":
-    global flag_skip
-    global flag_finished
-    global next_count
-
-    global root_path
-    global report_path
-    global src_path;  global src_relpath
-    global dst_path;  global dst_relpath
-    global crop_path
-    global copy_path; global copy_relpath
-
-    global images
-    global records
-
-    # variables
-    records = []
-    flag_skip = False
-    flag_finished = False
-
-    # file path
-    try:
-        script_path = os.path.realpath(__file__)
-    except:
-        script_path = os.path.realpath('__file__')
-
-    root_path   = os.path.dirname(script_path)
-    report_path = os.path.join(root_path, "report.json")
-    src_path  = "";  src_relpath  = ""
-    dst_path  = "";  dst_relpath  = ""
-    crop_path = ""
-    copy_path = ""
-
-    # parsing of argument
-    desc_str = "This program for creation of OpenCV annotation data."
-    parser = argparse.ArgumentParser(description=desc_str)
-    parser.add_argument("-s", "--srcpath", help="Path of input directory")
-    parser.add_argument("-d", "--dstpath", help="Path of output directory")
-
-    args = parser.parse_args()
-    if args.srcpath is None:
-        src_path = os.path.join(root_path, "static/img")
-    else:
-        src_path = os.path.join(os.getcwd(), args.srcpath)
-        src_path = os.path.abspath(src_path)
-
-    if args.dstpath is None:
-        head, tail = os.path.split(src_path)
-        dst_path  = os.path.join(head, "{0}_dst/{1}".format(tail, datestr))
-    else:
-        dst_path = os.path.join(os.getcwd(), args.dstpath)
-        dst_path = os.path.abspath(dst_path)
-
-    crop_path = os.path.join(dst_path, "{0}_crop".format(tail))
-    copy_path = os.path.join(dst_path, "img")
-
-    if not os.path.exists(src_path):
-        print("Error: Input path not found.")
-        sys.exit(1)
-
-    src_relpath  = os.path.relpath(src_path, root_path)
-    dst_relpath  = os.path.relpath(dst_path, root_path)
-    copy_relpath = os.path.relpath(copy_path, dst_path)
-
-
-    # preparation of images
-    images = [os.path.join(src_relpath, x)
-                for x in sorted(os.listdir(src_relpath))
-                if x.split(".")[-1]
-                in {"jpg","jpeg","png","bmp","gif"}]
-
-    if not len(images) > 0:
-        sys.exit("Error: Images not found.")
-    else:
-        records = [{
-            "type"   : "",
-            "path"   : "",
-            "coords" : []
-        }] * len(images)
-
-
-    # load report data
-    if os.path.exists(report_path):
-        data = load_report(report_path)
-        if data["count"] < len(images):
-            src_path   = data["src_path"]
-            dst_path   = data["dst_path"]
-            crop_path  = data["crop_path"]
-            copy_path  = data["copy_path"]
-            records    = data["records"]
-            images     = data["images"]
-            next_count = data["count"]
-            flag_skip  = True
-        else:
-            os.remove(report_path)
-
-
     # show path
     print("\nSource Path : {0}".format(os.path.abspath(src_path)))
     print("Destination Path : {0}".format(os.path.abspath(dst_path)))
