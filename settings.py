@@ -22,6 +22,7 @@ limit_lower_width  = 500
 limit_lower_height = 375
 
 # button alert
-alert_click_clear = True    # when push 'Clear'
-alert_click_skip  = False   # when push 'Skip'
-alert_click_next  = False   # when push 'Next'
+alert_click_clear   = True      # when push 'Clear'
+alert_click_overall = True      # when push 'Overall'
+alert_click_skip    = False     # when push 'Skip'
+alert_click_next    = False     # when push 'Next'

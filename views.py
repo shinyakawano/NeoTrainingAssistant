@@ -23,14 +23,15 @@ datestr = ttime.strftime("%Y%m%d%H%M%S")
 
 # settings
 config = {
-    "aspect_ratio"       : settings.aspect_ratio,
-    "limit_upper_width"  : settings.limit_upper_width,
-    "limit_upper_height" : settings.limit_upper_height,
-    "limit_lower_width"  : settings.limit_lower_width,
-    "limit_lower_height" : settings.limit_lower_height,
-    "alert_click_clear"  : settings.alert_click_clear,
-    "alert_click_skip"   : settings.alert_click_skip,
-    "alert_click_next"   : settings.alert_click_next
+    "aspect_ratio"        : settings.aspect_ratio,
+    "limit_upper_width"   : settings.limit_upper_width,
+    "limit_upper_height"  : settings.limit_upper_height,
+    "limit_lower_width"   : settings.limit_lower_width,
+    "limit_lower_height"  : settings.limit_lower_height,
+    "alert_click_clear"   : settings.alert_click_clear,
+    "alert_click_overall" : settings.alert_click_overall,
+    "alert_click_skip"    : settings.alert_click_skip,
+    "alert_click_next"    : settings.alert_click_next
 }
 
 interval = 5

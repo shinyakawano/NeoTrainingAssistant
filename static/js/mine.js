@@ -7,24 +7,25 @@ var ratio;
 var flag_first = false;
 
 var config = {
-    "aspect_ratio"       : 0,
-    "limit_upper_width"  : 800,
-    "limit_upper_height" : 600,
-    "limit_lower_width"  : 500,
-    "limit_lower_height" : 375,
-    "alert_click_clear"  : true,
-    "alert_click_skip"   : false,
-    "alert_click_next"   : false
+    "aspect_ratio"        : 0,
+    "limit_upper_width"   : 800,
+    "limit_upper_height"  : 600,
+    "limit_lower_width"   : 500,
+    "limit_lower_height"  : 375,
+    "alert_click_clear"   : true,
+    "alert_click_overall" : true,
+    "alert_click_skip"    : false,
+    "alert_click_next"    : false
 };
 
 
 // onload
 onload = function() {
-    draw(redraw=0);
+    draw(mode=0);
 
     $('#undo').on('click', function(){
         coords.pop();
-        draw(redraw=1);
+        draw(mode=1);
     });
     $('#clear').on('click', function(){
         if (config["alert_click_clear"]) {
@@ -32,11 +33,21 @@ onload = function() {
                 "Clear all rectangles. Are you OK?",
                 function(result) {
                     coords = new Array();
-                    draw(redraw=0);
+                    draw(mode=0);
                 });
         } else {
             coords = new Array();
-            draw(redraw=0);
+            draw(mode=0);
+        }
+    });
+
+    $('#overall').on('click', function(){
+        if (config["alert_click_clear"]) {
+            bootbox.confirm(
+                "Make rectangle encloses overall-image. Are you OK?",
+                function(result) {
+                    draw(mode=2);
+                });
         }
     });
 
@@ -74,7 +85,7 @@ onload = function() {
 
 
 // functions
-function draw(redraw) {
+function draw(mode) {
     var image = new Image();
     image.src = imgsrc;
 
@@ -127,17 +138,24 @@ function draw(redraw) {
         });
         context.drawImage(this, 0, 0, this.width, this.height, 0, 0, width, height);
 
-        if (redraw == 1) {
-            for (var i=0; i<coords.length; i++) {
-                var curr_crd = coords[i];
-                context.beginPath();
-                context.lineWidth = 3;
-                context.strokeStyle = 'rgba(238, 26, 26, 1)';
-                context.strokeRect(curr_crd[0], curr_crd[1],
-                        curr_crd[2], curr_crd[3]);
-            }
+        // redraw
+        if (mode == 1) {
+            redraw();
+
+        // select overall
+        } else if (mode == 2) {
+            redraw();
+
+            curr_crd = [0, 0, width, height, ratio];
+            context.beginPath();
+            context.lineWidth = 4;
+            context.strokeStyle = 'rgba(238, 26, 26, 1)';
+            context.strokeRect(curr_crd[0], curr_crd[1],
+                    curr_crd[2], curr_crd[3]);
+            coords.push(curr_crd);
         }
 
+        // Jcrop
         $(function(){
             $('#cnvs').Jcrop({
                 onSelect    : selected,
@@ -163,6 +181,17 @@ function released(c) {
             curr_crd[2], curr_crd[3]);
 }
 
+function redraw() {
+    for (var i=0; i<coords.length; i++) {
+        var curr_crd = coords[i];
+        context.beginPath();
+        context.lineWidth = 3;
+        context.strokeStyle = 'rgba(238, 26, 26, 1)';
+        context.strokeRect(curr_crd[0], curr_crd[1],
+                curr_crd[2], curr_crd[3]);
+    }
+}
+
 function next_ajax(skip) {
     coords = JSON.stringify(coords);
 
@@ -182,9 +211,10 @@ function next_ajax(skip) {
             config["limit_lower_width"]  = data.config["limit_lower_width"];
             config["limit_lower_height"] = data.config["limit_lower_height"];
 
-            config["alert_click_clear"]  = data.config["alert_click_clear"];
-            config["alert_click_skip"]   = data.config["alert_click_skip"];
-            config["alert_click_next"]   = data.config["alert_click_next"];
+            config["alert_click_clear"]   = data.config["alert_click_clear"];
+            config["alert_click_overall"] = data.config["alert_click_overall"];
+            config["alert_click_skip"]    = data.config["alert_click_skip"];
+            config["alert_click_next"]    = data.config["alert_click_next"];
 
             var count = data.count;
             var finished = data.finished;
@@ -206,7 +236,7 @@ function next_ajax(skip) {
 
             }
 
-            draw(redraw=1);
+            draw(mode=1);
         }
 
     });
@@ -231,9 +261,10 @@ function back_ajax() {
             config["limit_lower_width"]  = data.config["limit_lower_width"];
             config["limit_lower_height"] = data.config["limit_lower_height"];
 
-            config["alert_click_clear"]  = data.config["alert_click_clear"];
-            config["alert_click_skip"]   = data.config["alert_click_skip"];
-            config["alert_click_next"]   = data.config["alert_click_next"];
+            config["alert_click_clear"]   = data.config["alert_click_clear"];
+            config["alert_click_overall"] = data.config["alert_click_overall"];
+            config["alert_click_skip"]    = data.config["alert_click_skip"];
+            config["alert_click_next"]    = data.config["alert_click_next"];
 
             var count = data.count;
             var finished = data.finished;
@@ -245,7 +276,7 @@ function back_ajax() {
             }
             $('.count').html(tmp + ' of ' + imgnum);
 
-            draw(redraw=1);
+            draw(mode=1);
         }
 
     });
