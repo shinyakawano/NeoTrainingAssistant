@@ -33,9 +33,12 @@ onload = function() {
             bootbox.confirm(
                 "Clear all rectangles. Are you OK?",
                 function(result) {
-                    coords = new Array();
-                    draw(mode=0);
-                });
+                    if (result) {
+                        coords = new Array();
+                        draw(mode=0);
+                    }
+                }
+            );
         } else {
             coords = new Array();
             draw(mode=0);
@@ -47,8 +50,11 @@ onload = function() {
             bootbox.confirm(
                 "Make rectangle encloses overall-image. Are you OK?",
                 function(result) {
-                    draw(mode=2);
-                });
+                    if (result) {
+                        draw(mode=2);
+                    }
+                }
+            );
         }
     });
 
@@ -62,7 +68,9 @@ onload = function() {
                 bootbox.confirm(
                 "Skip this image. Are you OK?",
                 function(result) {
-                    next_ajax(skip=1);
+                    if (result) {
+                        next_ajax(skip=1);
+                    }
                 });
             } else {
                 next_ajax(skip=1);
@@ -78,7 +86,9 @@ onload = function() {
                 bootbox.confirm(
                 "Dismiss this image. Are you OK?",
                 function(result) {
-                    next_ajax(skip=2);
+                    if (result) {
+                        next_ajax(skip=2);
+                    }
                 });
        } else {
             next_ajax(skip=2);
