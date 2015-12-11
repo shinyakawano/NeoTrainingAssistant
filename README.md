@@ -50,7 +50,7 @@ This command starts the Flask server on port 5000, and please access `http://loc
 
 ### About buttons
 | Button   | Explanation  |
-|----------|:-------------|
+|:---------|:-------------|
 | Back     | back to previous image |
 | Undo     | remove a latest rectangle |
 | Clear    | remove all rectangles |
@@ -66,7 +66,7 @@ After all images will be processed, you will get `positive.txt`, `negative.txt` 
 You can change settings with edit of `NeoTrainingAssistant/settings.py`.
 
 | Flag                 | Default  | Explanation  |
-|----------------------|---------:|:-------------|
+|:---------------------|---------:|:-------------|
 | flag_save_crop       | True     | get cropped image |
 | flag_report_dump     | True     | get intermidiate json report |
 | report_dump_interval | 3        | interval of getting intermidiate json report |
