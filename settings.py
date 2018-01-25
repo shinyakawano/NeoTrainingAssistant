@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # get cropped images
-flag_save_crop = True
+flag_save_crop = False
 
 # report dump for unintended interruption
 flag_report_dump = True
@@ -24,6 +24,6 @@ limit_lower_height = 300
 # button alert
 alert_click_clear   = True      # when click 'Clear'
 alert_click_overall = True      # when click 'Overall'
-alert_click_dismiss = True      # when click 'Dismiss'
+alert_click_dismiss = False      # when click 'Dismiss'
 alert_click_skip    = False     # when click 'Skip'
-alert_click_next    = False     # when click 'Next'
+alert_click_next    = True     # when click 'Next'

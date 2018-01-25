@@ -8,6 +8,7 @@ import json
 import time
 import shutil
 import settings
+import urllib.request
 import argparse
 from flask import *
 from PIL import Image
@@ -32,19 +33,35 @@ def create_annotation(path, records):
     global root_path
     global copy_relpath
 
-    pos_f = open(os.path.join(path, "positive.dat"), "w")
-    neg_f = open(os.path.join(path, "negative.dat"), "w")
-    log_f = open(os.path.join(path, "log.dat"), "w")
+    print(root_path)
+    print(path)
+
+    #パスはルートにしてあげる
+    # pos_f = open(os.path.join(root_path, "positive_" + folder + ".dat"), "w")
+    # neg_f = open(os.path.join(root_path, "negative_" + folder + ".dat"), "w")
+    # log_f = open(os.path.join(path, "log.dat_" + folder + ""), "w")
+
+    #一旦わかりやすいように各フォルダ配下におく
+    pos_f = open(os.path.join(path, "positive_" + folder + ".dat"), "w")
+    neg_f = open(os.path.join(path, "negative_" + folder + ".dat"), "w")
+    log_f = open(os.path.join(path, "log.dat_" + folder + ""), "w")
+    done_f = open(os.path.join(path, "done_list.dat"), "w")
+
 
     if not os.path.exists(path):
         os.makedirs(path)
 
     for item in records:
+        #一枚ごとのループ
         fname = os.path.basename(item["path"])
-        tmp_path = os.path.join(copy_relpath, fname)
+        # tmp_path = os.path.join(copy_relpath, fname)
+
+        #datファイルはルート直下に置きたいのでimgのパスもルートで書く
+        tmp_path = item["path"]
 
         if item["type"] == "positive":
             tmp = ""
+            #一枚の中に複数cropあった時のループ
             for i, coord in enumerate(item["coords"]):
                 if settings.flag_save_crop:
                     root, ext = os.path.splitext(tmp_path)
@@ -64,6 +81,15 @@ def create_annotation(path, records):
             s = "{0}\n".format(tmp_path)
             neg_f.write(s)
             log_f.write(s)
+
+        #どのパターンでもdone_listには書き込む
+        s = "{0}\n".format(tmp_path)
+        done_f.write(s)
+
+        # elif item["type"] == "dismissed":
+        #     #log.datをチェック完了リストにしたいのでdismissedの時も書き込む
+        #     s = "{0} dismissed\n".format(tmp_path)
+        #     log_f.write(s)
 
     pos_f.close()
     neg_f.close()
@@ -126,7 +152,10 @@ parser = argparse.ArgumentParser(description=desc_str)
 parser.add_argument("-s", "--srcpath", help="Path of input directory")
 parser.add_argument("-d", "--dstpath", help="Path of output directory")
 
+# import pdb; pdb.set_trace()
 args = parser.parse_args()
+
+#引数にパスが入っていたらそこから読み込む
 if args.srcpath is None:
     src_path = os.path.join(root_path, "static/img")
 else:
@@ -154,28 +183,110 @@ copy_relpath = os.path.relpath(copy_path, dst_path)
 
 # preparation of images
 # load report data
-if os.path.exists(report_path):
 
-    # open json-file
-    f = open(report_path, "r")
-    data = json.load(f)
-    f.close()
+#画像の準備はアクセスがあった時におこなうようにする
+# if os.path.exists(report_path):
+#
+#     # open json-file
+#     f = open(report_path, "r")
+#     data = json.load(f)
+#     f.close()
+#
+#     # get data
+#     src_path   = data["src_path"]
+#     dst_path   = data["dst_path"]
+#     crop_path  = data["crop_path"]
+#     copy_path  = data["copy_path"]
+#     records    = data["records"]
+#     images     = data["images"]
+#     next_count = data["count"]
+#     flag_resume = True
+#
+# else:
+#     images = [os.path.join(src_relpath, x)
+#             for x in sorted(os.listdir(src_relpath))
+#             if x.split(".")[-1]
+#             in {"jpg","jpeg","png","bmp","gif"}]
+#
+#     if not len(images) > 0:
+#         sys.exit("Error: Images not found.")
+#     else:
+#         records = [{
+#             "type"   : "",
+#             "path"   : "",
+#             "coords" : []
+#         }] * len(images)
+#
+# img_num = len(images)
 
-    # get data
-    src_path   = data["src_path"]
-    dst_path   = data["dst_path"]
-    crop_path  = data["crop_path"]
-    copy_path  = data["copy_path"]
-    records    = data["records"]
-    images     = data["images"]
-    next_count = data["count"]
-    flag_resume = True
+# print('list: ', images)
+# print(len(images))
 
-else:
+
+
+# flask views
+@app.route("/")
+def index():
+
+    global count
+    global next_count
+    global images
+    global records
+    global interval
+    global img_num
+    global folder
+
+    # 作業フォルダはクエリで渡ってくる
+    folder = request.args.get("folder")
+    if folder is not None:
+        print(folder)
+    else:
+        return "Error: Please set folder name. e.g: http://localhost:5000/?folder=0_300"
+
+    src_path  = os.path.join(root_path, "static/{0}/img".format(folder))
+
+    src_relpath  = os.path.relpath(src_path, root_path)
+    dst_relpath  = os.path.relpath(dst_path, root_path)
+    copy_relpath = os.path.relpath(copy_path, dst_path)
+
+    #==画像の準備ここに移動==
     images = [os.path.join(src_relpath, x)
             for x in sorted(os.listdir(src_relpath))
             if x.split(".")[-1]
             in {"jpg","jpeg","png","bmp","gif"}]
+
+    #チェック完了リストと照らし合わせて完了済みのものは配列から削除
+    # 1.完了リスト分ループを回して、一致したらimagesから要素名指定で削除
+    # or
+    # 2.images分回して、一致したらそのimage削除
+    done_list_path  = os.path.join(root_path, "static/{0}/{1}".format(folder,'done_list.dat'))
+    # done_list_path = os.path.join(src_path,'done_list.dat')
+    print('完了リストパス', done_list_path)
+    if os.path.exists(done_list_path):
+        f = open(done_list_path, 'r')
+        # done_list  = []
+        done_list = f.readlines()
+        # for line in f.readlines():
+        #     done_list.append(line,)
+        print('完了リスト: ', done_list)
+        f.close()
+
+        print('画像リスト: ', done_list)
+
+    fruits = ['apple', 'orange', 'banana']
+    if 'banana' in fruits :
+        print('exists')
+
+    for done in done_list:
+        print(done)
+        if done in images:
+            print('存在する')
+        else:
+            print('存在しない')
+
+
+    print('削除前:' ,len(images))
+    print('削除後:' ,len(images))
 
     if not len(images) > 0:
         sys.exit("Error: Images not found.")
@@ -186,29 +297,22 @@ else:
             "coords" : []
         }] * len(images)
 
-img_num = len(images)
+    img_num = len(images)
+    #===========
 
-
-
-# flask views
-@app.route("/")
-def index():
-    global count
-    global next_count
-    global images
-    global records
-    global interval
-    global img_num
-
+    # import pdb; pdb.set_trace()
     counter = "{0} of {1}".format(count+1, img_num)
-
     # check finished
     if not flag_finished:
         imgsrc = ""
         if count < 0:
-            count = next_count-1
+            # count = next_count-1
+            count = 0
+            imgsrc = images[count]
+            print('index', count)
         else:
             imgsrc = images[count]
+            print(imgsrc)
         return render_template("index.html", imgsrc=imgsrc, \
                    imgnum=img_num, count=count, counter=counter)
 
@@ -244,8 +348,10 @@ def _next():
     except NameError:
         count = -1
 
+    print('_next img_path: ', img_path)
     # check skip
     if skip == "0" and not flag_finished:
+        #next(positive)のとき
         # coords of enclosed area
         coords = request.args.get("coords")
         coords = json.loads(coords)
@@ -268,6 +374,7 @@ def _next():
             records[count] = data
 
     elif skip == "1" and not flag_finished:
+        #skip(negative)のとき
         if count >= 0 and not flag_resume:
             data = {
                 "type"   : "negative",
@@ -278,6 +385,7 @@ def _next():
             flag_resume = False
 
     elif skip == "2" and not flag_finished:
+        #dismiss(分類にしようしない)のとき
         if count >= 0:
             data = {
                 "type"   : "dismissed",
@@ -314,22 +422,25 @@ def _next():
         coords = records[count+1]["coords"]
 
     elif count+1 == len(images):
+        #最後まで行った場合pos/negを書き込む
         flag_finished = True
+        #
+        # if not os.path.exists(dst_path):
+        #     os.makedirs(dst_path)
+        #
+        # if not os.path.exists(copy_path):
+        #     #まるっと画像フォルダコピー
+        #     # shutil.copytree(src_path, copy_path)　#一旦コメントアウト
+        #     if settings.flag_remove_src:
+        #         shutil.rmtree(src_path)
+        #         os.makedirs(src_path)
+        #
+        # if not os.path.exists(crop_path):
+        #     os.makedirs(crop_path)
 
-        if not os.path.exists(dst_path):
-            os.makedirs(dst_path)
-
-        if not os.path.exists(copy_path):
-            shutil.copytree(src_path, copy_path)
-            if settings.flag_remove_src:
-                shutil.rmtree(src_path)
-                os.makedirs(src_path)
-
-        if not os.path.exists(crop_path):
-            os.makedirs(crop_path)
-
-        create_annotation(dst_path, records)
-
+        # create_annotation(root_path, records)
+        # print('folder_name:', folder)
+        create_annotation(os.path.join(root_path, "static/{0}/".format(folder)), records)
         if os.path.exists(report_path):
             os.remove(report_path)
 
@@ -370,5 +481,3 @@ if __name__ == "__main__":
         debug=True,
         use_reloader=False,
     )
-
-
