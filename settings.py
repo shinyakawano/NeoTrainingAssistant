@@ -4,7 +4,7 @@
 flag_save_crop = False
 
 # report dump for unintended interruption
-flag_report_dump = True
+flag_report_dump = False
 report_dump_interval = 3
 
 # after create annotation, remove src images

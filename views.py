@@ -10,12 +10,45 @@ import shutil
 import settings
 import urllib.request
 import argparse
+import multiprocessing as mp
 from flask import *
 from PIL import Image
 from datetime import datetime
 
 
 # functions
+def clear_vars():
+    global dst_path
+    global crop_path
+    global copy_path
+    global report_path
+    global folder
+    global images
+    global records
+    global flag_resume
+    global flag_finished
+    global count
+    global next_count
+    global img_num
+
+    try:
+        # import pdb; pdb.set_trace()
+        dst_path = ''
+        crop_path = ''
+        copy_path = ''
+        report_path = ''
+        folder = ''
+        images = []
+        records = []
+        flag_resume = False
+        flag_finished = False
+        count = -1
+        next_count = 0
+        img_num = 0
+    except NameError:
+        print('TES')
+
+
 def crop_image(src, dst, coord):
     coord = [int(x/coord[-1]) for x in coord[:-1]]
     img = Image.open(src)
@@ -33,19 +66,20 @@ def create_annotation(path, records):
     global root_path
     global copy_relpath
 
-    print(root_path)
-    print(path)
+    # print(root_path)
+    # print(path)
 
     #パスはルートにしてあげる
-    # pos_f = open(os.path.join(root_path, "positive_" + folder + ".dat"), "w")
-    # neg_f = open(os.path.join(root_path, "negative_" + folder + ".dat"), "w")
-    # log_f = open(os.path.join(path, "log.dat_" + folder + ""), "w")
+    pos_f = open(os.path.join(root_path, "positive_" + folder + ".dat"), "w")
+    neg_f = open(os.path.join(root_path, "negative_" + folder + ".dat"), "w")
+    log_f = open(os.path.join(path, "log.dat"), "w")
+    done_f = open(os.path.join(path, "done_list.txt"), "w")
 
     #一旦わかりやすいように各フォルダ配下におく
-    pos_f = open(os.path.join(path, "positive_" + folder + ".dat"), "w")
-    neg_f = open(os.path.join(path, "negative_" + folder + ".dat"), "w")
-    log_f = open(os.path.join(path, "log.dat_" + folder + ""), "w")
-    done_f = open(os.path.join(path, "done_list.dat"), "w")
+    # pos_f = open(os.path.join(path, "positive_" + folder + ".dat"), "w")
+    # neg_f = open(os.path.join(path, "negative_" + folder + ".dat"), "w")
+    # log_f = open(os.path.join(path, "log.dat_" + folder + ""), "w")
+    # done_f = open(os.path.join(path, "done_list.dat"), "w")
 
 
     if not os.path.exists(path):
@@ -236,57 +270,32 @@ def index():
     global img_num
     global folder
 
+    if flag_finished:
+        #2回目のアクセスの場合変数をクリアして処理を進める
+        if count > 0:
+            clear_vars()
+
+
     # 作業フォルダはクエリで渡ってくる
     folder = request.args.get("folder")
-    if folder is not None:
-        print(folder)
-    else:
-        return "Error: Please set folder name. e.g: http://localhost:5000/?folder=0_300"
+    # if folder is not None:
+    #     print(folder)
+    # else:
+    #     return "Error: Please set folder name. e.g: http://localhost:5000/?folder=0_100"
 
     src_path  = os.path.join(root_path, "static/{0}/img".format(folder))
+    if not os.path.exists(src_path):
+        return "Error: folder doesn't exist. Please set folder name. e.g: http://localhost:5000/?folder=0_100"
 
     src_relpath  = os.path.relpath(src_path, root_path)
-    dst_relpath  = os.path.relpath(dst_path, root_path)
-    copy_relpath = os.path.relpath(copy_path, dst_path)
+    # dst_relpath  = os.path.relpath(dst_path, root_path)
+    # copy_relpath = os.path.relpath(copy_path, dst_path)
 
     #==画像の準備ここに移動==
     images = [os.path.join(src_relpath, x)
             for x in sorted(os.listdir(src_relpath))
             if x.split(".")[-1]
             in {"jpg","jpeg","png","bmp","gif"}]
-
-    #チェック完了リストと照らし合わせて完了済みのものは配列から削除
-    # 1.完了リスト分ループを回して、一致したらimagesから要素名指定で削除
-    # or
-    # 2.images分回して、一致したらそのimage削除
-    done_list_path  = os.path.join(root_path, "static/{0}/{1}".format(folder,'done_list.dat'))
-    # done_list_path = os.path.join(src_path,'done_list.dat')
-    print('完了リストパス', done_list_path)
-    if os.path.exists(done_list_path):
-        f = open(done_list_path, 'r')
-        # done_list  = []
-        done_list = f.readlines()
-        # for line in f.readlines():
-        #     done_list.append(line,)
-        print('完了リスト: ', done_list)
-        f.close()
-
-        print('画像リスト: ', done_list)
-
-    fruits = ['apple', 'orange', 'banana']
-    if 'banana' in fruits :
-        print('exists')
-
-    for done in done_list:
-        print(done)
-        if done in images:
-            print('存在する')
-        else:
-            print('存在しない')
-
-
-    print('削除前:' ,len(images))
-    print('削除後:' ,len(images))
 
     if not len(images) > 0:
         sys.exit("Error: Images not found.")
@@ -309,7 +318,7 @@ def index():
             # count = next_count-1
             count = 0
             imgsrc = images[count]
-            print('index', count)
+            # print('index', count)
         else:
             imgsrc = images[count]
             print(imgsrc)
@@ -448,6 +457,7 @@ def _next():
 
     return jsonify(imgsrc=imgsrc, finished=flag_finished, \
                     count=count, coords=coords, config=config)
+    import pdb; pdb.set_trace()
 
 
 @app.route("/_back")
@@ -470,14 +480,16 @@ def _back():
 # main function
 if __name__ == "__main__":
     # show path
-    print("\nSource Path : {0}".format(os.path.abspath(src_path)))
-    print("Destination Path : {0}".format(os.path.abspath(dst_path)))
-    if settings.flag_save_crop:
-        print("Cropped image Path : {0}".format(os.path.abspath(crop_path)))
-    print()
+    # print("\nSource Path : {0}".format(os.path.abspath(src_path)))
+    # print("Destination Path : {0}".format(os.path.abspath(dst_path)))
+    # if settings.flag_save_crop:
+    #     print("Cropped image Path : {0}".format(os.path.abspath(crop_path)))
+    # print()
 
     # run flask
     app.run(
+        host='localhost',
         debug=True,
+        port=5000,
         use_reloader=False,
-    )
+)
